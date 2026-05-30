@@ -32,7 +32,12 @@ export async function capturePane(pane, lines = 200) {
 }
 
 export async function sendKeys(pane, text) {
-  await execFileAsync('tmux', buildSendKeysArgs(pane, text));
+  // Send text and Enter as separate commands with a delay between them.
+  // Sending both in one tmux call causes Enter to fire before Claude Code's
+  // input handler finishes processing the text, silently dropping the submit.
+  await execFileAsync('tmux', ['send-keys', '-t', pane, text]);
+  await new Promise(r => setTimeout(r, 500));
+  await execFileAsync('tmux', ['send-keys', '-t', pane, 'Enter']);
 }
 
 export async function getPaneCommand(pane) {

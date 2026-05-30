@@ -26,6 +26,8 @@ const LIMIT_PATTERNS = [
   /(?:hit|exceeded|reached).*(?:your|the)\s*(?:\d+-hour\s+)?limit/i,  // "hit/exceeded/reached your limit"
   /\d+-hour limit/i,                                // "5-hour limit"
   /limit reached/i,                                  // "limit reached"
+  /session limit/i,                                  // "You've hit your session limit"
+  /weekly limit/i,                                   // "Weekly limit reached"
   /usage limit/i,                                    // "usage limit"
   /out of.*usage/i,                                  // "out of extra usage"
   /rate limit/i,                                     // "rate limit"
