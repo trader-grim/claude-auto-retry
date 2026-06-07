@@ -73,14 +73,19 @@ export function isRateLimited(text, customPatterns = []) {
 export function findRateLimitMessage(text, customPatterns = []) {
   const lines = stripAnsi(text).split('\n');
 
-  // Return the LAST "resets" line — the most recent time is most accurate
-  // when rate limit persists across multiple lines/polls
-  let lastReset = null;
-  let lastLimit = null;
-  for (const line of lines) {
-    if (RESET_PATTERNS.some(p => p.test(line))) lastReset = line.trim();
-    else if (LIMIT_PATTERNS.some(p => p.test(line))) lastLimit = line.trim();
+  // Scan from the bottom up — the most recent "resets" line in the pane is
+  // the one we should parse. The Claude TUI never clears earlier rate-limit
+  // messages from scrollback, so a forward scan would lock on stale ones
+  // (e.g. an 11:30am message lingering after Claude has resumed; a fresh
+  // 4:30pm message is below it but never reached).
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (RESET_PATTERNS.some(p => p.test(lines[i]))) return lines[i].trim();
   }
 
-  return lastReset || lastLimit || null;
+  // Fallback: any "limit" line, also scanned from the bottom.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (LIMIT_PATTERNS.some(p => p.test(lines[i]))) return lines[i].trim();
+  }
+
+  return null;
 }

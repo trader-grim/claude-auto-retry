@@ -3,12 +3,30 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFileCb);
 
+const SEND_ENTER_DELAY_MS = 300;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export function buildCaptureArgs(pane, lines = 200) {
   return ['capture-pane', '-t', pane, '-p', '-S', `-${lines}`];
 }
 
+/**
+ * @deprecated Single-shot send-keys (text + Enter atomically) races with the
+ * Claude TUI paste-heuristic: when text + \r arrive in the same pty write,
+ * \r is treated as a paste-newline rather than a submit. Retries pile into
+ * the input box without ever being submitted. Use buildSendLiteralArgs +
+ * buildSendEnterArgs with a delay between them instead.
+ */
 export function buildSendKeysArgs(pane, text) {
   return ['send-keys', '-t', pane, text, 'Enter'];
+}
+
+export function buildSendLiteralArgs(pane, text) {
+  return ['send-keys', '-t', pane, '-l', text];
+}
+
+export function buildSendEnterArgs(pane) {
+  return ['send-keys', '-t', pane, 'Enter'];
 }
 
 export function buildDisplayArgs(pane, format) {
@@ -32,7 +50,9 @@ export async function capturePane(pane, lines = 200) {
 }
 
 export async function sendKeys(pane, text) {
-  await execFileAsync('tmux', buildSendKeysArgs(pane, text));
+  await execFileAsync('tmux', buildSendLiteralArgs(pane, text));
+  await sleep(SEND_ENTER_DELAY_MS);
+  await execFileAsync('tmux', buildSendEnterArgs(pane));
 }
 
 export async function getPaneCommand(pane) {
