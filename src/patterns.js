@@ -148,7 +148,7 @@ const NETWORK_ERROR_PATTERNS = [
   /socket hang up/i,
   /connection timed out/i,
   /network.*error/i,
-  /request.*timed? out/i,
+  /request.*timeout/i,
   /gateway timeout/i,
   /API.*(?:unreachable|unavailable)/i,
 ];

@@ -32,6 +32,7 @@ async function launchInteractive(args) {
   const pane = getCurrentPane();
   const config = await loadConfig();
   let retries = 0;
+  let networkRetries = 0;
 
   // Signal handlers registered once, referencing a mutable holder so they
   // always forward to the currently-running Claude process without leaking
@@ -91,13 +92,13 @@ async function launchInteractive(args) {
 
     if (!isRateLimited(paneText, config.customPatterns)) {
       if (isNetworkError(paneText)) {
-        retries++;
-        if (retries > config.maxRetries) {
-          process.stderr.write(`[claude-auto-retry] Max retries (${config.maxRetries}) reached.\n`);
+        networkRetries++;
+        if (networkRetries > config.maxRetries) {
+          process.stderr.write(`[claude-auto-retry] Max network retries (${config.maxRetries}) reached.\n`);
           return exitCode;
         }
         const waitMs = config.networkRetrySeconds * 1000;
-        process.stderr.write(`[claude-auto-retry] Network error detected. Restarting in ${config.networkRetrySeconds}s (retry ${retries}/${config.maxRetries})...\n`);
+        process.stderr.write(`[claude-auto-retry] Network error detected. Restarting in ${config.networkRetrySeconds}s (retry ${networkRetries}/${config.maxRetries})...\n`);
         await new Promise((r) => setTimeout(r, waitMs));
         process.stderr.write(`[claude-auto-retry] Restarting Claude...\n`);
         continue;
