@@ -136,3 +136,24 @@ export function findSpendLimitMenuAction(text) {
   keys.push('Enter');
   return { keys };
 }
+
+const NETWORK_ERROR_PATTERNS = [
+  /ECONNREFUSED/,
+  /ETIMEDOUT/,
+  /ENOTFOUND/,
+  /ECONNRESET/,
+  /ECONNABORTED/,
+  /fetch failed/i,
+  /Failed to fetch/i,
+  /socket hang up/i,
+  /connection timed out/i,
+  /network.*error/i,
+  /request.*timed? out/i,
+  /gateway timeout/i,
+  /API.*(?:unreachable|unavailable)/i,
+];
+
+export function isNetworkError(text) {
+  const stripped = stripAnsi(text);
+  return NETWORK_ERROR_PATTERNS.some(p => p.test(stripped));
+}

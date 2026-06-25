@@ -7,6 +7,7 @@ export const DEFAULT_CONFIG = {
   pollIntervalSeconds: 5,
   marginSeconds: 60,
   fallbackWaitHours: 5,
+  networkRetrySeconds: 30,
   retryMessage: 'Continue where you left off. The previous attempt was rate limited.',
   customPatterns: [],
 };
@@ -22,6 +23,7 @@ function validate(cfg) {
   cfg.pollIntervalSeconds = validNumber(cfg.pollIntervalSeconds, 1, DEFAULT_CONFIG.pollIntervalSeconds);
   cfg.marginSeconds = validNumber(cfg.marginSeconds, 0, DEFAULT_CONFIG.marginSeconds);
   cfg.fallbackWaitHours = validNumber(cfg.fallbackWaitHours, 0.1, DEFAULT_CONFIG.fallbackWaitHours);
+  cfg.networkRetrySeconds = validNumber(cfg.networkRetrySeconds, 1, DEFAULT_CONFIG.networkRetrySeconds);
   if (typeof cfg.retryMessage !== 'string' || !cfg.retryMessage) {
     cfg.retryMessage = DEFAULT_CONFIG.retryMessage;
   }

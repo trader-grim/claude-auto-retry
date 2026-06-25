@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { isInsideTmux, getCurrentPane, capturePane, getTmuxVersion, buildSetWindowOptionArgs } from './tmux.js';
-import { isRateLimited, findRateLimitMessage } from './patterns.js';
+import { isRateLimited, findRateLimitMessage, isNetworkError } from './patterns.js';
 import { parseResetTime, calculateWaitMs } from './time-parser.js';
 import { loadConfig } from './config.js';
 
@@ -88,7 +88,22 @@ async function launchInteractive(args) {
     if (!pane) return exitCode;
 
     const paneText = await capturePane(pane, 30);
-    if (!isRateLimited(paneText, config.customPatterns)) return exitCode;
+
+    if (!isRateLimited(paneText, config.customPatterns)) {
+      if (isNetworkError(paneText)) {
+        retries++;
+        if (retries > config.maxRetries) {
+          process.stderr.write(`[claude-auto-retry] Max retries (${config.maxRetries}) reached.\n`);
+          return exitCode;
+        }
+        const waitMs = config.networkRetrySeconds * 1000;
+        process.stderr.write(`[claude-auto-retry] Network error detected. Restarting in ${config.networkRetrySeconds}s (retry ${retries}/${config.maxRetries})...\n`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        process.stderr.write(`[claude-auto-retry] Restarting Claude...\n`);
+        continue;
+      }
+      return exitCode;
+    }
 
     // Rate limited — wait and retry
     retries++;
@@ -164,14 +179,25 @@ async function launchPrintMode(args) {
 }
 
 async function createTmuxSession(args) {
-  const sessionName = `claude-retry-${process.pid}-${Date.now()}`;
+  const SESSION_NAME = 'claude';
+
+  // Reuse an existing session if one is already running
+  try {
+    execFileSync('tmux', ['has-session', '-t', SESSION_NAME], { stdio: 'ignore' });
+    const attachResult = spawn('tmux', ['attach-session', '-t', SESSION_NAME], { stdio: 'inherit' });
+    return new Promise((resolve) => {
+      attachResult.on('exit', (code) => resolve(code ?? 0));
+      attachResult.on('error', () => resolve(1));
+    });
+  } catch {}
+
+  const sessionName = SESSION_NAME;
   const launcherPath = __filename;
 
-  // Build the command to run inside tmux
+  // Build the command to run inside tmux; keep shell alive after Claude exits
   const escapedLauncher = shellEscape(launcherPath);
   const escapedArgs = args.map(a => shellEscape(a)).join(' ');
-  // Use bash -c so the session dies when the launcher exits
-  const innerCmd = `CLAUDE_AUTO_RETRY_ACTIVE=1 exec node ${escapedLauncher} ${escapedArgs}`;
+  const innerCmd = `CLAUDE_AUTO_RETRY_ACTIVE=1 node ${escapedLauncher} ${escapedArgs}; exec $SHELL`;
 
   // Build env propagation args
   // tmux -e flag requires tmux >= 3.0; for older versions, prefix env exports in the command
